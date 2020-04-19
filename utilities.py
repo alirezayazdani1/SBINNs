@@ -55,13 +55,19 @@ class neural_net(object):
         for l in range(0,self.num_layers-1):
             in_dim = self.layers[l]
             out_dim = self.layers[l+1]
-            W = np.random.normal(size=[in_dim, out_dim])
+            W = self.xavier_init(size=[in_dim, out_dim])
             b = np.zeros([1, out_dim])
             g = np.ones([1, out_dim])
             # tensorflow variables
             self.weights.append(tf.Variable(W, dtype=tf.float32, trainable=True))
             self.biases.append(tf.Variable(b, dtype=tf.float32, trainable=True))
             self.gammas.append(tf.Variable(g, dtype=tf.float32, trainable=True))
+
+    def xavier_init(self, size):
+        in_dim = size[0]
+        out_dim = size[1]        
+        xavier_stddev = np.sqrt(2/(in_dim + out_dim))
+        return tf.random.truncated_normal([in_dim, out_dim], stddev=xavier_stddev)
             
     def __call__(self, *inputs):
                 
@@ -71,10 +77,10 @@ class neural_net(object):
             W = self.weights[l]
             b = self.biases[l]
             g = self.gammas[l]
-            # weight normalization
-            V = W/tf.norm(W, axis = 0, keepdims=True)
+#            # weight normalization
+#            V = W/tf.norm(W, axis = 0, keepdims=True)
             # matrix multiplication
-            H = tf.matmul(H, V)
+            H = tf.matmul(H, W)
             # add bias
             H = g*H + b
             # activation

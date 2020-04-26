@@ -4,6 +4,27 @@
 
 import tensorflow as tf
 import numpy as np
+import random
+import uuid
+
+def heaviside(x: tf.Tensor, g: tf.Graph = tf.get_default_graph()):
+    # Generate random name in order to avoid conflicts with inbuilt names
+    rnd_name = 'HeavisideGrad-' + '%0x' % random.getrandbits(30 * 4)
+    
+    @tf.RegisterGradient(rnd_name)
+    def _heaviside_grad(unused_op: tf.Operation, grad: tf.Tensor):
+        return tf.maximum(0.0, 1.0 - tf.abs(unused_op.inputs[0])) * grad
+    
+    custom_grads = {
+        'Identity': rnd_name
+    }
+    
+    with g.gradient_override_map(custom_grads):
+        i = tf.identity(x, name='identity_' + str(uuid.uuid1()))
+        ge = tf.greater_equal(x, 0, name='ge_' + str(uuid.uuid1()))
+        # tf.stop_gradient is needed to exclude tf.to_float from derivative
+        step_func = i + tf.stop_gradient(tf.to_float(ge) - i)
+        return step_func
 
 def tf_session():
     # tf session
@@ -17,12 +38,12 @@ def tf_session():
     sess.run(init)
     return sess
 
-def relative_error(pred, exact):
+def relative_error(exact, pred):
     if type(pred) is np.ndarray:
         return np.sqrt(np.mean(np.square(pred - exact))/np.mean(np.square(exact - np.mean(exact))))
     return tf.sqrt(tf.reduce_mean(tf.square(pred - exact))/tf.reduce_mean(tf.square(exact - tf.reduce_mean(exact))))
 
-def mean_squared_error(pred, exact):
+def mean_squared_error(exact, pred):
     if type(pred) is np.ndarray:
         return np.mean(np.square(pred - exact))
     return tf.reduce_mean(tf.square(pred - exact))
@@ -77,10 +98,10 @@ class neural_net(object):
             W = self.weights[l]
             b = self.biases[l]
             g = self.gammas[l]
-#            # weight normalization
-#            V = W/tf.norm(W, axis = 0, keepdims=True)
+            # weight normalization
+            V = W/tf.norm(W, axis = 0, keepdims=True)
             # matrix multiplication
-            H = tf.matmul(H, W)
+            H = tf.matmul(H, V)
             # add bias
             H = g*H + b
             # activation

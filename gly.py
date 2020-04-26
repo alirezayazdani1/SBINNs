@@ -18,9 +18,7 @@ class HiddenPathways(object):
         self.t_min = t_data.min(0)
         self.t_max = t_data.max(0)
         
-        self.S_data_std = S_data.std(0)
-        self.S_data_std_comp = tf.Variable(tf.ones(shape=[self.D,]),
-                                           dtype=tf.float32, trainable=False)
+        self.S_scale = tf.Variable(S_data.std(0), dtype=tf.float32, trainable=False)
         
         # data on velocity (inside the domain)
         self.t_data, self.S_data = t_data, S_data
@@ -60,8 +58,8 @@ class HiddenPathways(object):
         self.logA = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         
         self.var_list_eqns = [self.logJ0, self.logk1, self.logk2, self.logk3, self.logk4,
-                              self.logk5, self.logk6, self.logk, self.logkappa, self.logq,
-                              self.logK1, self.logpsi, self.logN, self.logA]
+                              self.logk5, self.logk6, self.logk, self.logkappa,
+                              self.logq, self.logK1, self.logpsi, self.logN, self.logA]
   
         self.J0 = tf.exp(self.logJ0)
         self.k1 = tf.exp(self.logk1)
@@ -85,26 +83,21 @@ class HiddenPathways(object):
 
         # physics uninformed neural networks
         self.net_sysbio = neural_net(self.t_data, layers = self.layers)
-
+        
         self.H_data = 2.0*(self.t_data_tf - self.t_min)/(self.t_max - self.t_min) - 1.0
-        self.S_data_pred = self.S_data[0,:] + self.S_data_std*(self.H_data+1.0)*self.net_sysbio(self.H_data)
-#        self.S_data_pred = self.S_data_std*self.net_sysbio(self.H_data)
+        self.S_data_pred = self.S_data[0,:] + self.S_scale*(self.H_data+1.0)*self.net_sysbio(self.H_data)
 
         # physics informed neural networks
         self.H_eqns = 2.0*(self.t_eqns_tf - self.t_min)/(self.t_max - self.t_min) - 1.0
-        self.S_eqns_pred = self.S_data[0,:] + self.S_data_std*(self.H_eqns+1.0)*self.net_sysbio(self.H_eqns)
-#        self.S_eqns_pred = self.S_data_std*self.net_sysbio(self.H_eqns)
+        self.S_eqns_pred = self.S_data[0,:] + self.S_scale*(self.H_eqns+1.0)*self.net_sysbio(self.H_eqns)
 
-        self.E_eqns_pred = self.SysODE(self.S_eqns_pred, self.t_eqns_tf)
+        self.E_eqns_pred = self.SysODE(self.S_data_pred, self.t_data_tf)
 
-        self.S_data_std_comp = 0.9*self.S_data_std_comp + 0.1*tf.math.reduce_std(self.S_eqns_pred, 0)
-#        tf.assign(self.S_data_std_comp[4:6], self.S_data_std[4:6])
-        
         # loss
-        self.loss_data = mean_squared_error(self.S_data_tf[:,4:6]/self.S_data_std_comp[4:6], self.S_data_pred[:,4:6]/self.S_data_std_comp[4:6])
-        self.loss_eqns = mean_squared_error(self.E_eqns_pred/self.S_data_std_comp, 0.0)
-        self.loss_auxl = mean_squared_error(self.S_data_tf[-1,:]/self.S_data_std_comp, self.S_data_pred[-1,:]/self.S_data_std_comp)
-        self.loss = 0.975*(self.loss_data+self.loss_auxl) + 0.025*self.loss_eqns
+        self.loss_data = mean_squared_error(self.S_data_tf[:,4:6]/self.S_scale[4:6], self.S_data_pred[:,4:6]/self.S_scale[4:6])
+        self.loss_eqns = mean_squared_error(self.E_eqns_pred/self.S_scale, 0.0)
+        self.loss_auxl = mean_squared_error(self.S_data_tf[-1,:]/self.S_scale, self.S_data_pred[-1,:]/self.S_scale)
+        self.loss = 0.95*self.loss_data + 0.05*self.loss_eqns + 0.05*self.loss_auxl
         
         # optimizers
         self.learning_rate = tf.placeholder(tf.float32, shape=[])
@@ -122,13 +115,18 @@ class HiddenPathways(object):
         self.sess = tf_session()
 
     def SysODE(self, S, t):
-
-        F1 = self.J0 - (self.k1*S[:,0:1]*S[:,5:6])/(1 + (S[:,5:6]/self.K1)**self.q)
-        F2 = 2*(self.k1*S[:,0:1]*S[:,5:6])/(1 + (S[:,5:6]/self.K1)**self.q) - self.k2*S[:,1:2]*(self.N-S[:,4:5]) - self.k6*S[:,1:2]*S[:,4:5]
+        S = tf.where(S[:,:] < 0.0, tf.zeros_like(S[:,:]), S[:,:])
+#        self.S_scale = 0.9*self.S_scale + 0.1*tf.math.reduce_std(S, 0)
+#        self.S_scale = tf.map_fn(lambda x: x, self.S_data_std[4:6])
+#        self.K1 = tf.cond(self.K1 < 0.1,
+#                          lambda: tf.multiply(self.K1, 10.0), lambda: tf.multiply(self.K1, 1.0))
+        
+        F1 = self.J0 - (self.k1*S[:,0:1]*S[:,5:6])/(1+(S[:,5:6]/self.K1)**self.q)
+        F2 = 2*(self.k1*S[:,0:1]*S[:,5:6])/(1+(S[:,5:6]/self.K1)**self.q) - self.k2*S[:,1:2]*(self.N-S[:,4:5]) - self.k6*S[:,1:2]*S[:,4:5]
         F3 = self.k2*S[:,1:2]*(self.N-S[:,4:5]) - self.k3*S[:,2:3]*(self.A-S[:,5:6])
         F4 = self.k3*S[:,2:3]*(self.A-S[:,5:6]) - self.k4*S[:,3:4]*S[:,4:5] - self.kappa*(S[:,3:4]-S[:,6:7])
         F5 = self.k2*S[:,1:2]*(self.N-S[:,4:5]) - self.k4*S[:,3:4]*S[:,4:5] - self.k6*S[:,1:2]*S[:,4:5]
-        F6 = -2*(self.k1*S[:,0:1]*S[:,5:6])/(1 + (S[:,5:6]/self.K1)**self.q) + 2*self.k3*S[:,2:3]*(self.A-S[:,5:6]) - self.k5*S[:,5:6]
+        F6 = -2*(self.k1*S[:,0:1]*S[:,5:6])/(1+(S[:,5:6]/self.K1)**self.q) + 2*self.k3*S[:,2:3]*(self.A-S[:,5:6]) - self.k5*S[:,5:6]
         F7 = self.psi*self.kappa*(S[:,3:4]-S[:,6:7]) - self.k*S[:,6:7]
         
         F = tf.concat([F1, F2, F3, F4, F5, F6, F7], 1)
@@ -177,14 +175,15 @@ class HiddenPathways(object):
 
     def predict(self, t_star):
         
-        tf_dict = {self.t_data_tf: t_star}
+        tf_dict = {self.t_data_tf: t_star,
+                   self.t_eqns_tf: t_star}
         
-        S_star = self.sess.run(self.S_data_pred, tf_dict)
-        return S_star
+        S_star, S_scale = self.sess.run([self.S_data_pred, self.S_scale], tf_dict)
+        return S_star, S_scale
 
 if __name__ == "__main__": 
     
-    layers = [1] + 10*[7*40] + [7]
+    layers = [1] + 8*[7*40] + [7]
     
     # function that returns dx/dt
     def f(x, t): # x is 7 x 1
@@ -203,12 +202,12 @@ if __name__ == "__main__":
         N = 1.0
         A = 4.0
         
-        f1 = J0 - (k1*x[0]*x[5])/(1 + (x[5]/K1)**q)
-        f2 = 2*(k1*x[0]*x[5])/(1 + (x[5]/K1)**q) - k2*x[1]*(N-x[4]) - k6*x[1]*x[4]
+        f1 = J0 - (k1*x[0]*x[5])/(1+(x[5]/K1)**q)
+        f2 = 2*(k1*x[0]*x[5])/(1+(x[5]/K1)**q) - k2*x[1]*(N-x[4]) - k6*x[1]*x[4]
         f3 = k2*x[1]*(N-x[4]) - k3*x[2]*(A-x[5])
         f4 = k3*x[2]*(A-x[5]) - k4*x[3]*x[4] - kappa*(x[3]-x[6])
         f5 = k2*x[1]*(N-x[4]) - k4*x[3]*x[4] - k6*x[1]*x[4]
-        f6 = -2*(k1*x[0]*x[5])/(1 + (x[5]/K1)**q) + 2*k3*x[2]*(A-x[5]) - k5*x[5]
+        f6 = -2*(k1*x[0]*x[5])/(1+(x[5]/K1)**q) + 2*k3*x[2]*(A-x[5]) - k5*x[5]
         f7 = psi*kappa*(x[3]-x[6]) - k*x[6]
         
         f = np.array([f1, f2, f3, f4, f5, f6, f7])
@@ -216,15 +215,14 @@ if __name__ == "__main__":
 
     def addNoise(S, noise):
         std = noise*S.std(0)
-        S[1:,4:5] += np.random.normal(0.0, std[4], (S.shape[0]-1, 1))
-        S[1:,5:6] += np.random.normal(0.0, std[5], (S.shape[0]-1, 1))
+        S[1:,:] += np.random.normal(0.0, std, (S.shape[0]-1, S.shape[1]))
         return S
         
     # time points
     t_star = np.arange(0, 10, 0.005)
     N = t_star.shape[0]
     N_eqns = N
-    N_data = N // 2
+    N_data = N // 5
     
     S1 = np.random.uniform(0.15, 1.60, 1)
     S2 = np.random.uniform(0.19, 2.16, 1)
@@ -242,12 +240,12 @@ if __name__ == "__main__":
     # solve ODE
     S_star = odeint(f, x0, t_star)
     
-    noise = 0.1
+    noise = 0.0
     t_train = t_star[:,None]
     S_train = addNoise(S_star, noise)
 
     N0 = 0
-    N1 = N // 2
+    N1 = N-2
     idx_data = np.concatenate([np.array([N0]),
                                np.random.choice(np.arange(1, N-1), size=N_data, replace=False),
                                np.array([N-1]),
@@ -261,12 +259,11 @@ if __name__ == "__main__":
                            t_train[idx_eqns],
                            layers)
 
-    model.train(num_epochs = 10000, batch_size = N_data, learning_rate = 1e-3)
-    model.train(num_epochs = 10000, batch_size = N_data, learning_rate = 1e-4)
-    model.train(num_epochs = 5000, batch_size = N_data, learning_rate = 1e-5)
-#    model.train(num_epochs = 60000, batch_size = N_data, learning_rate = 1e-6)
-
-    S_pred = model.predict(t_star[:,None])
+    model.train(num_epochs=40000, batch_size=N_eqns, learning_rate=1e-3)
+    model.train(num_epochs=80000, batch_size=N_eqns, learning_rate=1e-4)
+    model.train(num_epochs=40000, batch_size=N_eqns, learning_rate=1e-5)
+    
+    S_pred, S_pred_std = model.predict(t_star[:,None])
     
     ####### Plotting ##################
     

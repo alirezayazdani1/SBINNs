@@ -55,25 +55,16 @@ def fwd_gradients(Y, x):
     return Y_x
 
 class neural_net(object):
-    def __init__(self, *inputs, layers):
+    def __init__(self, layers):
         
         self.layers = layers
         self.num_layers = len(self.layers)
-        
-        if len(inputs) == 0:
-            in_dim = self.layers[0]
-            self.X_mean = np.zeros([1, in_dim])
-            self.X_std = np.ones([1, in_dim])
-        else:
-            X = np.concatenate(inputs, 1)
-            self.X_mean = X.mean(0, keepdims=True)
-            self.X_std = X.std(0, keepdims=True)
         
         self.weights = []
         self.biases = []
         self.gammas = []
         
-        for l in range(0,self.num_layers-1):
+        for l in range(0, self.num_layers-1):
             in_dim = self.layers[l]
             out_dim = self.layers[l+1]
             W = self.xavier_init(size=[in_dim, out_dim])
@@ -99,7 +90,7 @@ class neural_net(object):
             b = self.biases[l]
             g = self.gammas[l]
             # weight normalization
-            V = W/tf.norm(W, axis = 0, keepdims=True)
+            V = W / tf.norm(W, axis = 0, keepdims=True)
             # matrix multiplication
             H = tf.matmul(H, V)
             # add bias

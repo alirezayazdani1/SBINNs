@@ -19,7 +19,8 @@ class HiddenPathways:
         self.t_min = t_data.min(0)
         self.t_max = t_data.max(0)
         
-        self.S_scale = tf.Variable(S_data.std(0), dtype=tf.float32, trainable=False)
+#        self.S_scale = tf.Variable(np.array(self.D*[1.0]), dtype=tf.float32, trainable=False)
+        self.S_scale = S_data.std(0)
         
         # data on velocity (inside the domain)
         self.t_data, self.S_data = t_data, S_data
@@ -109,27 +110,34 @@ class HiddenPathways:
         self.t_eqns_tf = tf.placeholder(tf.float32, shape=[None, 1])
         self.mt_tf = tf.placeholder(tf.float32, shape=[None, self.mt.shape[1]])
         self.mq_tf = tf.placeholder(tf.float32, shape=[None, self.mq.shape[1]])
+        self.learning_rate = tf.placeholder(tf.float32, shape=[])
 
         # physics uninformed neural networks
-        self.net_sysbio = neural_net(self.t_data, layers=self.layers)
+        self.net_sysbio = neural_net(layers=self.layers)
         
-#        self.H_data = 2.0*(self.t_data_tf - self.t_min)/(self.t_max - self.t_min) - 1.0
-#        self.S_data_pred = self.S_data[0,:] + self.S_scale*(self.H_data+1.0)*self.net_sysbio(self.H_data)
-#
-#        # physics informed neural networks
-#        self.H_eqns = 2.0*(self.t_eqns_tf - self.t_min)/(self.t_max - self.t_min) - 1.0
-#        self.S_eqns_pred = self.S_data[0,:] + self.S_scale*(self.H_eqns+1.0)*self.net_sysbio(self.H_eqns)
-#
-        self.S_data_pred, self.E_eqns_pred, self.IG = self.SysODE(self.t_data_tf, self.mt_tf, self.mq_tf)
+        self.H_data = 2.0*(self.t_data_tf - self.t_min)/(self.t_max - self.t_min) - 1.0
+        self.S_data_pred = self.S_data[0,:] + self.S_scale*(self.H_data+1.0)*self.net_sysbio(self.H_data)
 
+        # physics informed neural networks
+        self.H_eqns = 2.0*(self.t_eqns_tf - self.t_min)/(self.t_max - self.t_min) - 1.0
+        self.S_eqns_pred = self.S_data[0,:] + self.S_scale*(self.H_eqns+1.0)*self.net_sysbio(self.H_eqns)
+
+        self.E_eqns_pred, self.IG = self.SysODE(self.S_eqns_pred, self.t_eqns_tf,
+                                                self.H_eqns, self.mt_tf, self.mq_tf)
+
+        # Adaptive S_scale
+#        self.S_scale = 0.9*self.S_scale + 0.1*tf.math.reduce_std(self.S_eqns_pred, 0)
+#        scale_list = tf.unstack(self.S_scale)
+#        scale_list[2] = self.S_data.std(0)[2]
+#        self.S_scale = tf.stack(scale_list)
+        
         # loss
-        self.loss_data = mean_squared_error(self.S_data_tf[:,2:3]/self.S_scale[2], self.S_data_pred[:,2:3]/self.S_scale[2])
+        self.loss_data = mean_squared_error(self.S_data_tf[:,2:3]/self.S_scale[2:3], self.S_data_pred[:,2:3]/self.S_scale[2:3])
         self.loss_eqns = mean_squared_error(0.0, self.E_eqns_pred/self.S_scale)
         self.loss_auxl = mean_squared_error(self.S_data_tf[-1,:]/self.S_scale, self.S_data_pred[-1,:]/self.S_scale)
         self.loss = 0.99*self.loss_data + 0.01*self.loss_eqns + 0.01*self.loss_auxl
 
         # optimizers
-        self.learning_rate = tf.placeholder(tf.float32, shape=[])
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
         self.optimizer_para = tf.train.AdamOptimizer(learning_rate=0.001)
 
@@ -143,11 +151,9 @@ class HiddenPathways:
         
         self.sess = tf_session()
         
-    def SysODE(self, t, mt, mq):
-        H = 2.0*(t - self.t_min)/(self.t_max - self.t_min) - 1.0
-        S_tilde = self.net_sysbio(H)
-        S = self.S_data[0,:] + self.S_scale*(H+1.0)*S_tilde
-
+    def SysODE(self, S, t, H, mt, mq):
+#        S = tf.where(S[:,:] < 0.0, tf.ones_like(S[:,:]), S[:,:])
+        
         intake = self.k * mq * heaviside(H-mt) * tf.exp(self.k*(mt-H)*(self.t_max-self.t_min)/2.0)
         IG = tf.reduce_sum(intake, axis=1, keepdims=True)
         kappa = 1.0/self.Vi + 1.0/(self.E*self.ti)
@@ -169,7 +175,7 @@ class HiddenPathways:
         S_t = fwd_gradients(S, t)
         
         E = S_t - F
-        return S, E, IG
+        return E, IG
     
     def train(self, num_epochs, batch_size, learning_rate):
 
@@ -182,11 +188,11 @@ class HiddenPathways:
                 idx_data = np.concatenate([np.array([0]),
                                           np.random.choice(np.arange(1, N_data-1), min(batch_size, N_data)-2),
                                           np.array([N_data-1])])
-                idx_eqns = np.array(np.arange(it*batch_size, (it+1)*batch_size)) #np.random.choice(N_eqns, batch_size)
+                idx_eqns = np.random.choice(N_eqns, batch_size)
 
                 t_data_batch, S_data_batch = self.t_data[idx_data,:], self.S_data[idx_data,:]
                 t_eqns_batch = self.t_eqns[idx_eqns,:]
-                mt_batch, mq_batch = self.mt[idx_data,:], self.mq[idx_data,:]
+                mt_batch, mq_batch = self.mt[idx_eqns,:], self.mq[idx_eqns,:]
     
                 tf_dict = {self.t_data_tf: t_data_batch,
                            self.S_data_tf: S_data_batch,
@@ -213,16 +219,16 @@ class HiddenPathways:
     def predict(self, t_star, meal_tq):
         
         meal_tq[0] = 2.0*(meal_tq[0] - self.t_min)/(self.t_max - self.t_min) - 1.0
-        tf_dict = {self.t_data_tf: t_star,
+        tf_dict = {self.t_eqns_tf: t_star,
                    self.mt_tf: meal_tq[0], self.mq_tf: meal_tq[1]}
         
-        S_star, IG = self.sess.run([self.S_data_pred, self.IG], tf_dict)
+        S_star, IG = self.sess.run([self.S_eqns_pred, self.IG], tf_dict)
         S_star = np.append(S_star[:,:], IG[:], axis=1)
         return S_star
 
 if __name__ == "__main__": 
     
-    layers = [1] + 5*[6*30] + [6]
+    layers = [1] + 6*[6*30] + [6]
 
     meal_t = [300., 650., 1100., 2000.]
     meal_q = [60e3, 40e3, 50e3, 100e3]
@@ -275,27 +281,27 @@ if __name__ == "__main__":
     
     # function that returns dx/dt
     def f_pred(x, t): # x is 6 x 1
-        k = 0.008452
-        Rm = 195.623553
+        k =  0.007751
+        Rm = 73.858517
         Vg = 10.000000
-        C1 = 299.185109
-        a1 = 6.577122
-        Ub = 69.282806
-        C2 = 99.703950
-        U0 = 10.179196
-        Um = 246.831083
-        C3 = 267.665839
-        C4 = 235.929227
-        Vi = 4.260534
-        E = 0.068354
-        ti = 83.107742
-        beta = 1.737333
-        Rg = 182.453167
-        alpha = 7.077085
-        Vp = 1.030994
-        C5 = 75.517887
-        tp = 6.417090
-        td = 11.976399
+        C1 = 319.160032
+        a1 = 6.253946
+        Ub = 86.824888
+        C2 = 152.637362
+        U0 = 19.412358
+        Um = 141.051173
+        C3 = 235.955381
+        C4 = 251.580667
+        Vi = 2.689281
+        E = 0.147199
+        ti = 36.766254
+        beta = 2.475349
+        Rg = 212.777472
+        alpha = 7.182466
+        Vp = 0.707807
+        C5 = 101.811242
+        tp = 139.384628
+        td = 7.417875
         
         kappa = 1.0/Vi + 1.0/E/ti
         f1 = Rm / (1.0 + np.exp(-x[2]/Vg/C1 + a1))
@@ -366,7 +372,7 @@ if __name__ == "__main__":
     t_star = np.arange(0, 3000, 1.0)
     N = t_star.shape[0]
     N_eqns = N
-    N_data = N // 3
+    N_data = N // 5
 
     k = 1./120.
     Vp = 3.0
@@ -384,14 +390,16 @@ if __name__ == "__main__":
     
     # solve ODE
     S_star = odeint(f, x0, t_star)
-    S_star /= Vg2
+    S_star /= Vg2 # scaling by Vg^2
     IG_star = np.array([intake(t, k) for t in t_star]) / Vg2
 
     t_train = t_star[:,None]
     S_train = S_star
 
+    # two-point data must be given for all the species
+    # 1st: initial at t=0; 2nd: any point between (0,T]
     N0 = 0
-    N1 = N - 2
+    N1 = N // 2
     idx_data = np.concatenate([np.array([N0]),
                                np.random.choice(np.arange(1, N-1), size=N_data, replace=False),
                                np.array([N-1]),
@@ -408,13 +416,13 @@ if __name__ == "__main__":
                            layers,
                            meal_tq)
 
-    model.train(num_epochs=10000, batch_size=N_eqns, learning_rate=1e-3)
-    model.train(num_epochs=15000, batch_size=N_eqns, learning_rate=1e-4)
-    model.train(num_epochs=10000, batch_size=N_eqns, learning_rate=1e-5)
+    model.train(num_epochs=50000, batch_size=N_eqns, learning_rate=1e-3)
+    model.train(num_epochs=50000, batch_size=N_eqns, learning_rate=1e-4)
+    model.train(num_epochs=20000, batch_size=N_eqns, learning_rate=1e-5)
 
     # NN prediction
     meal_tq = [np.array([N*[x] for x in meal_t]).T,
-               np.array([N*[x/Vg2] for x in meal_q]).T]        
+               np.array([N*[x/Vg2] for x in meal_q]).T] 
     
     S_pred = model.predict(t_star[:,None], meal_tq)
     plotting(t_star, S_star, S_pred, idx_data, Vg2)
@@ -442,20 +450,20 @@ if __name__ == "__main__":
     print('td = %.6f' % ( model.sess.run(model.td) ) )
     
     # Prediction based on inferred parameters
-    k = 0.008452
-    Vp = 1.030994
-    Vi = 4.260534
-    S0 = 12.0*Vp
-    S1 = 4.0*Vi
-    S2 = 110.0*Vg2
-    S3 = 0.0
-    S4 = 0.0
-    S5 = 0.0
-    x0 = np.array([S0, S1, S2, S3, S4, S5]).flatten()    
-    S_pred = odeint(f_pred, x0, t_star)
-    S_pred /= Vg2
-    IG_pred = np.array([intake(t, k) for t in t_star]) / Vg2
-    S_pred = np.append(S_pred[:,:], IG_pred[:,None], axis=1)
-    plotting(t_star, S_star, S_pred, idx_data, Vg2, forecast=True)
+#    k =  0.007751
+#    Vp = 0.707807
+#    Vi = 2.689281
+#    S0 = 12.0*Vp
+#    S1 = 4.0*Vi
+#    S2 = 110.0*Vg2
+#    S3 = 0.0
+#    S4 = 0.0
+#    S5 = 0.0
+#    x0 = np.array([S0, S1, S2, S3, S4, S5]).flatten()    
+#    S_pred = odeint(f_pred, x0, t_star)
+#    S_pred /= Vg2
+#    IG_pred = np.array([intake(t, k) for t in t_star]) / Vg2
+#    S_pred = np.append(S_pred[:,:], IG_pred[:,None], axis=1)
+#    plotting(t_star, S_star, S_pred, idx_data, Vg2, forecast=True)
     
     # savefig('./figures/Glycolytic', crop = False)

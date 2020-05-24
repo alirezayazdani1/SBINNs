@@ -15,9 +15,9 @@ import time
 
 import uuid
 
-@tf.RegisterGradient("HeavisideGrad")
-def _heaviside_grad(unused_op: tf.Operation, grad: tf.Tensor):
-    return tf.maximum(0.0, 1.0 - tf.abs(unused_op.inputs[0])) * grad
+#@tf.RegisterGradient("HeavisideGrad")
+#def _heaviside_grad(unused_op: tf.Operation, grad: tf.Tensor):
+#    return tf.maximum(0.0, 1.0 - tf.abs(unused_op.inputs[0])) * grad
 
 
 def heaviside(x: tf.Tensor, g: tf.Graph = tf.get_default_graph()):
@@ -41,7 +41,8 @@ class HiddenPathways:
         self.t_max = t.max(0)
         
         self.S_mean = S.mean(0)
-        self.S_std = S.std(0)
+        self.S_std = self.D*[1.0]#S.std(0)
+        
         
         # data on concentrations
         self.t = t
@@ -67,13 +68,13 @@ class HiddenPathways:
 #        self.Um = tf.Variable(90.0, dtype=tf.float32, trainable=False)
 #        self.C3 = tf.Variable(100.0, dtype=tf.float32, trainable=False)
 #        self.C4 = tf.Variable(80.0, dtype=tf.float32, trainable=False)
-#        self.Vi = tf.Variable(11.0, dtype=tf.float32, trainable=False)
+        self.Vi = tf.Variable(11.0, dtype=tf.float32, trainable=False)
 #        self.E = tf.Variable(0.2, dtype=tf.float32, trainable=False)
 #        self.ti = tf.Variable(100.0, dtype=tf.float32, trainable=False)
 #        self.beta = tf.Variable(1.772, dtype=tf.float32, trainable=False)
 #        self.Rg = tf.Variable(180.0, dtype=tf.float32, trainable=False)
 #        self.alpha = tf.Variable(7.5, dtype=tf.float32, trainable=False)
-#        self.Vp = tf.Variable(3.0, dtype=tf.float32, trainable=False)
+        self.Vp = tf.Variable(3.0, dtype=tf.float32, trainable=False)
 #        self.C5 = tf.Variable(26.0, dtype=tf.float32, trainable=False)
 #        self.tp = tf.Variable(6.0, dtype=tf.float32, trainable=False)
 #        self.td = tf.Variable(12.0, dtype=tf.float32, trainable=False)
@@ -89,13 +90,13 @@ class HiddenPathways:
         self.logUm = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logC3 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logC4 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
-        self.logVi = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.logVi = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logE = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logti = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logbeta = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logRg = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logalpha = tf.Variable(0.0, dtype=tf.float32, trainable=True)
-        self.logVp = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.logVp = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logC5 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logtp = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logtd = tf.Variable(0.0, dtype=tf.float32, trainable=True)
@@ -103,8 +104,8 @@ class HiddenPathways:
         
         self.var_list_eqns = [self.logk, self.logRm, self.logC1, self.loga1, self.logUb, 
                               self.logC2, self.logU0, self.logUm, self.logC3, self.logC4, 
-                              self.logE, self.logti, self.logbeta, self.logRg, self.logalpha, 
-                              self.logC5, self.logtp, self.logtd, self.logVi, self.logVp]
+                              self.logE, self.logbeta, self.logRg, self.logalpha, 
+                              self.logC5, self.logti, self.logtp, self.logtd]#, self.logVi, self.logVp]
   
         self.k = tf.exp(self.logk)
         self.Rm = tf.exp(self.logRm)
@@ -117,13 +118,13 @@ class HiddenPathways:
         self.Um = tf.exp(self.logUm)
         self.C3 = tf.exp(self.logC3)
         self.C4 = tf.exp(self.logC4)
-        self.Vi = tf.exp(self.logVi)
+#        self.Vi = tf.exp(self.logVi)
         self.E = tf.exp(self.logE)
         self.ti = tf.exp(self.logti)
         self.beta = tf.exp(self.logbeta)
         self.Rg = tf.exp(self.logRg)
         self.alpha = tf.exp(self.logalpha)
-        self.Vp = tf.exp(self.logVp)
+#        self.Vp = tf.exp(self.logVp)
         self.C5 = tf.exp(self.logC5)
         self.tp = tf.exp(self.logtp)
         self.td = tf.exp(self.logtd)
@@ -147,10 +148,10 @@ class HiddenPathways:
          self.E_pred, self.IG) = self.net_HiddenPathways(self.t_tf, self.mt_tf, self.mq_tf)
 
         # loss
-        self.loss_data = tf.reduce_mean(tf.square((self.S_tf[:,2:3] - self.S_pred[:,2:3])/self.S_std[2]))
+        self.loss_data = tf.reduce_mean(tf.square((self.S_tf[:,2:3] - self.S_pred[:,2:3])/self.S_std[2:3]))
         self.loss_eqns = tf.reduce_mean(tf.square(self.E_pred/self.S_std[:]))
         self.loss_auxl = tf.reduce_mean(tf.square((self.S_tf[-1,:]-self.S_pred[-1,:])/self.S_std[:]))
-        self.loss = 0.98*self.loss_data + 0.01*self.loss_eqns + 0.01*self.loss_auxl
+        self.loss = 0.999*self.loss_data + 0.001*self.loss_eqns + 0.001*self.loss_auxl
         
         # optimizers
         self.optimizer = tf.train.AdamOptimizer(learning_rate = self.learning_rate)
@@ -162,7 +163,7 @@ class HiddenPathways:
 #                                                                           var_list = self.var_list_eqns))
 #        self.gradsnorm, _ = tf.clip_by_global_norm(self.grads, 1.0)
 #        self.trainpara_op = self.optimizer_para.apply_gradients(zip(self.gradsnorm, self.vars))
-        self.weightnorm, _ = tf.clip_by_global_norm(self.weights, 1.0)
+        self.weights, _ = tf.clip_by_global_norm(self.weights, 1.0)
 
         init = tf.global_variables_initializer()
         self.sess.run(init)
@@ -206,7 +207,7 @@ class HiddenPathways:
         H = 2.0*(t - self.t_min)/(self.t_max - self.t_min) - 1.0
         S_tilde = self.neural_net(H, self.weights, self.biases)
         S = self.S[0,:] + self.S_std*(H + 1.0)*S_tilde
-
+        
         intake = self.k * mq * heaviside(H-mt) * tf.exp(self.k*(mt-H)*(self.t_max-self.t_min)/2.0)
         IG = tf.reduce_sum(intake, axis=1, keepdims=True)
         kappa = 1.0/self.Vi + 1.0/(self.E*self.ti)
@@ -235,8 +236,8 @@ class HiddenPathways:
         for epoch in range(num_epochs):
             
             N = self.t.shape[0]
-            perm = np.concatenate( (np.array([0]), np.random.permutation(np.arange(1,N)),
-                                    np.array([N])) )
+            perm = np.concatenate( (np.array([0]), np.random.permutation(np.arange(1,N-1)),
+                                    np.array([N-1])) )
             
             start_time = time.time()
             for it in range(0, N, batch_size):
@@ -282,7 +283,7 @@ class HiddenPathways:
 
 if __name__ == "__main__": 
     
-    layers = [1] + 5*[6*30] + [6]
+    layers = [1] + 6*[6*30] + [6]
 
     meal_t = [300., 650., 1100., 2000.]
     meal_q = [60e3, 40e3, 50e3, 100e3]
@@ -455,10 +456,10 @@ if __name__ == "__main__":
     
     model = HiddenPathways(t_train[perm], S_train[perm,:], layers, meal_tq)
 
-    model.train(num_epochs = 20000, batch_size = perm.shape[0], learning_rate = 1e-3)
-    model.train(num_epochs = 40000, batch_size = perm.shape[0], learning_rate = 1e-4)
-    model.train(num_epochs = 40000, batch_size = perm.shape[0], learning_rate = 1e-5)
-    model.train(num_epochs = 20000, batch_size = perm.shape[0], learning_rate = 1e-6)
+    model.train(num_epochs = 200000, batch_size = perm.shape[0], learning_rate = 1e-3)
+    model.train(num_epochs = 100000, batch_size = perm.shape[0], learning_rate = 1e-4)
+    model.train(num_epochs = 20000, batch_size = perm.shape[0], learning_rate = 1e-5)
+#    model.train(num_epochs = 20000, batch_size = perm.shape[0], learning_rate = 1e-6)
 
     meal_tq = [np.array([N_train*[x] for x in meal_t]).T,
                np.array([N_train*[x/Vg2] for x in meal_q]).T]        

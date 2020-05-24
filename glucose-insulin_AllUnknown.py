@@ -1,5 +1,5 @@
 import tensorflow as tf
-import tensorflow_probability as tfp
+#import tensorflow_probability as tfp
 
 import numpy as np
 
@@ -166,8 +166,8 @@ class HiddenPathways:
 
         self.train_op = self.optimizer.minimize(self.loss, var_list = self.weights + self.biases)
         self.trainpara_op = self.optimizer_para.minimize(self.loss, var_list = self.var_list_eqns)
-        self.trainintake_op = tfp.optimizer.nelder_mead_minimize(self.loss_fcn, initial_vertex=self.start,
-                                                                 max_iterations=5000)
+#        self.trainintake_op = tfp.optimizer.nelder_mead_minimize(self.loss_fcn, initial_vertex=self.start,
+#                                                                 max_iterations=5000)
         self.weightnorm, _ = tf.clip_by_global_norm(self.weights, 1.0)
 
         init = tf.global_variables_initializer()

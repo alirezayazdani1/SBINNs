@@ -22,7 +22,7 @@ class HiddenPathways:
 #        self.S_scale = tf.Variable(np.array(self.D*[1.0]), dtype=tf.float32, trainable=False)
         self.S_scale = S_data.std(0)
         
-        # data on velocity (inside the domain)
+        # data on all the species (only some are used as input)
         self.t_data, self.S_data = t_data, S_data
         self.t_eqns = t_eqns
                 
@@ -33,75 +33,74 @@ class HiddenPathways:
         self.mq = meal_tq[1]
         
 #        self.k = tf.Variable(1.0/120.0, dtype=tf.float32, trainable=False)
-#        self.Rm = tf.Variable(209.0, dtype=tf.float32, trainable=False)
+        self.Rm = tf.Variable(209.0/100.0, dtype=tf.float32, trainable=False)
         self.Vg = tf.Variable(10.0, dtype=tf.float32, trainable=False)
-#        self.C1 = tf.Variable(300.0, dtype=tf.float32, trainable=False)
-#        self.a1 = tf.Variable(6.6, dtype=tf.float32, trainable=False)
-#        self.Ub = tf.Variable(72.0, dtype=tf.float32, trainable=False)
-#        self.C2 = tf.Variable(144.0, dtype=tf.float32, trainable=False)
-#        self.U0 = tf.Variable(4.0, dtype=tf.float32, trainable=False)
-#        self.Um = tf.Variable(90.0, dtype=tf.float32, trainable=False)
-#        self.C3 = tf.Variable(100.0, dtype=tf.float32, trainable=False)
-#        self.C4 = tf.Variable(80.0, dtype=tf.float32, trainable=False)
-#        self.Vi = tf.Variable(11.0, dtype=tf.float32, trainable=False)
-#        self.E = tf.Variable(0.2, dtype=tf.float32, trainable=False)
-#        self.ti = tf.Variable(100.0, dtype=tf.float32, trainable=False)
+        self.C1 = tf.Variable(300.0/100.0, dtype=tf.float32, trainable=False)
+        self.a1 = tf.Variable(6.6, dtype=tf.float32, trainable=False)
+#        self.Ub = tf.Variable(72.0/100.0, dtype=tf.float32, trainable=False)
+#        self.C2 = tf.Variable(144.0/100.0, dtype=tf.float32, trainable=False)
+#        self.U0 = tf.Variable(4.0/100.0, dtype=tf.float32, trainable=False)
+#        self.Um = tf.Variable(90.0/100.0, dtype=tf.float32, trainable=False)
+#        self.C3 = tf.Variable(100.0/100.0, dtype=tf.float32, trainable=False)
+#        self.C4 = tf.Variable(80.0/100.0, dtype=tf.float32, trainable=False)
+        self.Vi = tf.Variable(11.0, dtype=tf.float32, trainable=False)
+        self.E = tf.Variable(0.2, dtype=tf.float32, trainable=False)
+        self.ti = tf.Variable(100.0, dtype=tf.float32, trainable=False)
 #        self.beta = tf.Variable(1.772, dtype=tf.float32, trainable=False)
-#        self.Rg = tf.Variable(180.0, dtype=tf.float32, trainable=False)
+#        self.Rg = tf.Variable(180.0/100.0, dtype=tf.float32, trainable=False)
 #        self.alpha = tf.Variable(7.5, dtype=tf.float32, trainable=False)
-#        self.Vp = tf.Variable(3.0, dtype=tf.float32, trainable=False)
-#        self.C5 = tf.Variable(26.0, dtype=tf.float32, trainable=False)
-#        self.tp = tf.Variable(6.0, dtype=tf.float32, trainable=False)
+        self.Vp = tf.Variable(3.0, dtype=tf.float32, trainable=False)
+#        self.C5 = tf.Variable(26.0/100.0, dtype=tf.float32, trainable=False)
+        self.tp = tf.Variable(6.0, dtype=tf.float32, trainable=False)
 #        self.td = tf.Variable(12.0, dtype=tf.float32, trainable=False)
 
         self.logk = tf.Variable(-6.0, dtype=tf.float32, trainable=True)
-        self.logRm = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.logRm = tf.Variable(0.0, dtype=tf.float32, trainable=True)
 #        self.logVg = tf.Variable(0.0, dtype=tf.float32, trainable=True)
-        self.logC1 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
-        self.loga1 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.logC1 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.loga1 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logUb = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logC2 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logU0 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logUm = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logC3 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logC4 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
-        self.logVi = tf.Variable(0.0, dtype=tf.float32, trainable=True)
-        self.logE = tf.Variable(0.0, dtype=tf.float32, trainable=True)
-        self.logti = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.logVi = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.logE = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.logti = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logbeta = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logRg = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logalpha = tf.Variable(0.0, dtype=tf.float32, trainable=True)
-        self.logVp = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.logVp = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logC5 = tf.Variable(0.0, dtype=tf.float32, trainable=True)
-        self.logtp = tf.Variable(0.0, dtype=tf.float32, trainable=True)
+#        self.logtp = tf.Variable(0.0, dtype=tf.float32, trainable=True)
         self.logtd = tf.Variable(0.0, dtype=tf.float32, trainable=True)
 
-        
-        self.var_list_eqns = [self.logk, self.logRm, self.logC1, self.loga1, self.logUb, 
+        self.var_list_eqns = [self.logk, self.logUb, 
                               self.logC2, self.logU0, self.logUm, self.logC3, self.logC4, 
-                              self.logE, self.logti, self.logbeta, self.logRg, self.logalpha, 
-                              self.logC5, self.logtp, self.logtd, self.logVi, self.logVp]
+                              self.logbeta, self.logRg, self.logalpha, self.logC5,
+                              self.logtd]
   
         self.k = tf.exp(self.logk)
-        self.Rm = tf.exp(self.logRm)
+#        self.Rm = tf.exp(self.logRm)
 #        self.Vg = tf.exp(self.logVg)
-        self.C1 = tf.exp(self.logC1)
-        self.a1 = tf.exp(self.loga1)
+#        self.C1 = tf.exp(self.logC1)
+#        self.a1 = tf.exp(self.loga1)
         self.Ub = tf.exp(self.logUb)
         self.C2 = tf.exp(self.logC2)
         self.U0 = tf.exp(self.logU0)
         self.Um = tf.exp(self.logUm)
         self.C3 = tf.exp(self.logC3)
         self.C4 = tf.exp(self.logC4)
-        self.Vi = tf.exp(self.logVi)
-        self.E = tf.exp(self.logE)
-        self.ti = tf.exp(self.logti)
+#        self.Vi = tf.exp(self.logVi)
+#        self.E = tf.exp(self.logE)
+#        self.ti = tf.exp(self.logti)
         self.beta = tf.exp(self.logbeta)
         self.Rg = tf.exp(self.logRg)
         self.alpha = tf.exp(self.logalpha)
-        self.Vp = tf.exp(self.logVp)
+#        self.Vp = tf.exp(self.logVp)
         self.C5 = tf.exp(self.logC5)
-        self.tp = tf.exp(self.logtp)
+#        self.tp = tf.exp(self.logtp)
         self.td = tf.exp(self.logtd)
 
         # placeholders for data
@@ -147,13 +146,9 @@ class HiddenPathways:
                                                           self.net_sysbio.gammas])
         self.trainpara_op = self.optimizer_para.minimize(self.loss,
                                                          var_list=self.var_list_eqns)
-        self.net_sysbio.weights, _ = tf.clip_by_global_norm(self.net_sysbio.weights, 1.0)
-        
         self.sess = tf_session()
         
     def SysODE(self, S, t, H, mt, mq):
-#        S = tf.where(S[:,:] < 0.0, tf.ones_like(S[:,:]), S[:,:])
-        
         intake = self.k * mq * heaviside(H-mt) * tf.exp(self.k*(mt-H)*(self.t_max-self.t_min)/2.0)
         IG = tf.reduce_sum(intake, axis=1, keepdims=True)
         kappa = 1.0/self.Vi + 1.0/(self.E*self.ti)
@@ -399,7 +394,7 @@ if __name__ == "__main__":
     # two-point data must be given for all the species
     # 1st: initial at t=0; 2nd: any point between (0,T]
     N0 = 0
-    N1 = N // 2
+    N1 = N - 1
     idx_data = np.concatenate([np.array([N0]),
                                np.random.choice(np.arange(1, N-1), size=N_data, replace=False),
                                np.array([N-1]),
@@ -416,9 +411,9 @@ if __name__ == "__main__":
                            layers,
                            meal_tq)
 
-    model.train(num_epochs=50000, batch_size=N_eqns, learning_rate=1e-3)
-    model.train(num_epochs=50000, batch_size=N_eqns, learning_rate=1e-4)
-    model.train(num_epochs=20000, batch_size=N_eqns, learning_rate=1e-5)
+    model.train(num_epochs=25000, batch_size=N_eqns, learning_rate=1e-3)
+    model.train(num_epochs=25000, batch_size=N_eqns, learning_rate=1e-4)
+    model.train(num_epochs=10000, batch_size=N_eqns, learning_rate=1e-5)
 
     # NN prediction
     meal_tq = [np.array([N*[x] for x in meal_t]).T,

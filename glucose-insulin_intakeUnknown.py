@@ -158,7 +158,7 @@ class HiddenPathways:
         self.loss_data = tf.reduce_mean(tf.square((self.S_tf[:,2:3] - self.S_pred[:,2:3])/self.S_std[2]))
         self.loss_eqns = tf.reduce_mean(tf.square(self.E_pred/self.S_std[0:self.E_pred.shape[1]]))
         self.loss_auxl = tf.reduce_mean(tf.square((self.S_tf[-1,:]-self.S_pred[-1,:])/self.S_std[:]))
-        self.loss = 0.98*self.loss_data + 0.01*self.loss_eqns + 0.01*self.loss_auxl
+        self.loss = 0.99*self.loss_data + 0.01*self.loss_eqns + 0.01*self.loss_auxl
         
         # optimizers
         self.optimizer = tf.train.AdamOptimizer(learning_rate = self.learning_rate)

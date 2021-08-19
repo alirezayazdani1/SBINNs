@@ -13,6 +13,8 @@ The code depends on the deep learning package [DeepXDE](https://github.com/lulul
 
 ## Cite this work
 
+If you use this code for academic research, you are encouraged to cite the following paper:
+
 ```
 @article{yazdani2020systems,
   title   = {Systems biology informed deep learning for inferring parameters and hidden dynamics},

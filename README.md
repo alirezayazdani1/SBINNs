@@ -4,7 +4,7 @@ The code for the paper [A. Yazdani, L. Lu, M. Raissi, & G. E. Karniadakis. Syste
 
 ## Code
 
-The code depends on the deep learning package [DeepXDE](https://github.com/lululxvi/deepxde) v0.10.0. If you want to use the latest DeepXDE, you need to replace `dde.bc.PointSet` with `dde.PointSetBC`.
+The code depends on the deep learning package [DeepXDE](https://github.com/lululxvi/deepxde) v0.10.0. If you want to use the latest DeepXDE, you need to replace `dde.bc.PointSet` with `dde.PointSetBC`. You can also find the updated code at https://github.com/lu-group/sbinn.
 
 - [glycolysis.py](glycolysis.py): Yeast glycolysis model
 - [apoptosis.py](apoptosis.py): Cell apoptosis model

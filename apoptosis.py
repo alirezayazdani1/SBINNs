@@ -89,7 +89,7 @@ def pinn(data_t, data_y):
     idx = np.append(
         np.random.choice(np.arange(1, n - 1), size=n // 5, replace=False), [0, n - 1]
     )
-    ptset = dde.bc.PointSet(data_t[idx])
+    ptset = dde.utils.external.PointSet(data_t[idx])
     inside = lambda x, _: ptset.inside(x)
     observe_y3 = dde.DirichletBC(
         geom, ptset.values_to_func(data_y[idx, 3:4]), inside, component=3
